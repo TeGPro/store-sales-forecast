@@ -1,20 +1,41 @@
-# Что здесь будет: загрузка модели и получение прогноза.
-#
-# Сделай две функции:
-# load_model(path="model.joblib") — читает сохраненный словарь через joblib.load.
-# predict_sales(df, saved_model) — возвращает прогноз для каждой строки.
-#
-# Вход predict_sales: DataFrame с date, store_nbr, family, onpromotion
-# и словарь с model, preprocessor, feature_columns из train.py.
-# Внутри predict_sales:
-# 1. Вызови ту же prepare_data из data_preparation.py.
-# 2. Проверь наличие нужных колонок и поставь их в порядок feature_columns.
-# 3. Вызови сохраненный preprocessor.transform (не fit_transform).
-# 4. Вызови model.predict, затем np.expm1 и ограничь результат снизу нулем.
-# Выход: numpy-массив неотрицательных чисел в исходном порядке строк.
-#
-# Для простой ручной проверки под if __name__ == "__main__": прочитай data/test.csv,
-# загрузи модель, получи прогноз и сохрани CSV submission.csv с колонками id,sales.
-# После реализации запуск: python predict.py.
-# API будет использовать эти же функции, поэтому обучение сюда не переносим.
-# Сейчас это только комментарии, прогноз не реализован.
+import joblib
+import numpy as np
+import pandas as pd
+from data_preparation import prepare_data
+
+def load_model(path="model.joblib"):
+    with open(path, 'rb') as f:
+        saved_model = joblib.load(f)
+    return saved_model
+        
+def predict_sales(df, saved_model):
+    df = prepare_data(df)
+    
+    required_columns = saved_model['feature_columns']
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    
+    if missing_columns:
+        raise ValueError(f"В датафрейме отсутствуют необходимые колонки: {missing_columns}")
+    
+    df = df[required_columns]
+    
+    preprocessor = saved_model['preprocessor']
+    df_transformed = preprocessor.transform(df)
+    model = saved_model['model']
+    
+    predictions_log = model.predict(df_transformed)
+    predictions = np.expm1(predictions_log)
+    predictions = np.maximum(predictions, 0)
+    return predictions
+
+if __name__ == '__main__':
+    df = pd.read_csv('data/test.csv')
+    saved_model = load_model()
+    predictions = predict_sales(df, saved_model)
+
+    submission = pd.DataFrame({
+        'id': df['id'],
+        'sales': predictions
+    })
+    submission.to_csv('submission.csv', index=False)
+    print(submission.head())
