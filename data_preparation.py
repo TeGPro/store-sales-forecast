@@ -36,6 +36,9 @@ def prepare_data(df):
     validate='many_to_one'
     )
     
+    if df_sales_stores['city'].isna().any():
+        raise ValueError('В запросе есть неизвестный магазин.')
+
     df_sales_oil = pd.merge(
     df_sales_stores,
     df_oil,
